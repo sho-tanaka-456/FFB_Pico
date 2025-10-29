@@ -40,7 +40,7 @@
 #define UART_ID_1 uart1
 #define UART_BAUD_1 2500000
 
-#define WHEEL_ANGLE 180 // degree
+#define WHEEL_ANGLE 90 // degree
 #define REDUCTION_RATIO 4
 
 /*--------------共有変数------------*/
