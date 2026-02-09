@@ -20,13 +20,14 @@
 #include "hardware/uart.h"
 #include "hardware/sync.h"
 // 設定：使用GPIOピンと周波数
-#define PIN_U 16
-#define PIN_V 18
-#define PIN_W 17
+#define PIN_UH 20
+#define PIN_VH 16
+#define PIN_WH 18
+#define PIN_UL PIN_UH + 1
+#define PIN_VL PIN_VH + 1
+#define PIN_WL PIN_WH + 1
 #define DE_PIN 10            // MAX485 DE
 #define RE_PIN 6             // MAX485 RE
-#define UART_TX_PIN_uart0 12 // TXピン
-#define UART_RX_PIN_uart0 13 // RXピン
 #define UART_TX_PIN_uart1 8  // TXピン
 #define UART_RX_PIN_uart1 9  // RXピン
 #define LED_FFB_ACTIVE 4     // FFBアクティブLED
@@ -40,7 +41,7 @@
 #define UART_ID_1 uart1
 #define UART_BAUD_1 2500000
 
-#define WHEEL_ANGLE 180 // degree
+#define WHEEL_ANGLE 360 // degree
 #define REDUCTION_RATIO 4
 
 /*--------------共有変数------------*/
@@ -123,20 +124,26 @@ void pwm_wrap_irq_handler()
     pwm_set_chan_level(slice_u, chan_u, du);
     pwm_set_chan_level(slice_v, chan_v, dv);
     pwm_set_chan_level(slice_w, chan_w, dw);
+    pwm_set_chan_level(slice_u, !chan_u, du);
+    pwm_set_chan_level(slice_v, !chan_v, dv);
+    pwm_set_chan_level(slice_w, !chan_w, dw);
 }
 
 void pwm_init_set()
 {
     // PWM GPIO 設定
-    gpio_set_function(PIN_U, GPIO_FUNC_PWM);
-    gpio_set_function(PIN_V, GPIO_FUNC_PWM);
-    gpio_set_function(PIN_W, GPIO_FUNC_PWM);
-    slice_u = pwm_gpio_to_slice_num(PIN_U);
-    chan_u = pwm_gpio_to_channel(PIN_U);
-    slice_v = pwm_gpio_to_slice_num(PIN_V);
-    chan_v = pwm_gpio_to_channel(PIN_V);
-    slice_w = pwm_gpio_to_slice_num(PIN_W);
-    chan_w = pwm_gpio_to_channel(PIN_W);
+    gpio_set_function(PIN_UH, GPIO_FUNC_PWM);
+    gpio_set_function(PIN_VH, GPIO_FUNC_PWM);
+    gpio_set_function(PIN_WH, GPIO_FUNC_PWM);
+    gpio_set_function(PIN_UL, GPIO_FUNC_PWM);
+    gpio_set_function(PIN_VL, GPIO_FUNC_PWM);
+    gpio_set_function(PIN_WL, GPIO_FUNC_PWM);
+    slice_u = pwm_gpio_to_slice_num(PIN_UH);
+    chan_u = pwm_gpio_to_channel(PIN_UH);
+    slice_v = pwm_gpio_to_slice_num(PIN_VH);
+    chan_v = pwm_gpio_to_channel(PIN_VH);
+    slice_w = pwm_gpio_to_slice_num(PIN_WH);
+    chan_w = pwm_gpio_to_channel(PIN_WH);
 
     // sysclk 周波数取得
     uint sysclk_hz = frequency_count_khz(CLOCKS_FC0_SRC_VALUE_CLK_SYS) * 1000;
@@ -160,10 +167,13 @@ void pwm_init_set()
     pwm_set_chan_level(slice_u, chan_u, 0);
     pwm_set_chan_level(slice_v, chan_v, 0);
     pwm_set_chan_level(slice_w, chan_w, 0);
+    pwm_set_chan_level(slice_u, !chan_u, 0);
+    pwm_set_chan_level(slice_v, !chan_v, 0);
+    pwm_set_chan_level(slice_w, !chan_w, 0);
 
-    // pwm_set_output_polarity(slice_u, false, true);
-    // pwm_set_output_polarity(slice_v, false, true);
-    // pwm_set_output_polarity(slice_w, false, true);
+    pwm_set_output_polarity(slice_u, false, true);
+    pwm_set_output_polarity(slice_v, false, true);
+    pwm_set_output_polarity(slice_w, false, true);
 
     // 正弦位相ステップ Δθ = 2π * SINE_FREQ_HZ / CARRIER_FREQ_HZ
     // delta_phase = (float)PHASE_MAX * (float)SINE_FREQ_HZ / (float)CARRIER_FREQ_HZ;
@@ -220,7 +230,7 @@ typedef struct
 void send_hid_report()
 {
     static hid_report_t report = {0};
-    report.x = -convert_angle(rotateNum_core0, angle_core0);
+    report.x = convert_angle(rotateNum_core0, angle_core0);
     report.y = 0;
 
     if (tud_hid_ready())
@@ -401,11 +411,11 @@ void core1_main()
         MR = fabs(torque);
         if (limitRot_core1 > 0)
         {
-            a = -8192;
+            a = 8192;
         }
         else if (limitRot_core1 < 0)
         {
-            a = 8192;
+            a = -8192;
         }
         else
         {
