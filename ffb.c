@@ -87,11 +87,14 @@ const uint32_t angle_offset = 7420;
 volatile int32_t elec_angle = 0;
 /*---------------------------------------------*/
 
-int apply_limit(int value,int max){
-    if (value < 0){
+int apply_limit(int value, int max)
+{
+    if (value < 0)
+    {
         value = 0;
     }
-    if (value > max){
+    if (value > max)
+    {
         value = max;
     }
     return value;
@@ -170,7 +173,7 @@ void pwm_init_set()
     pwm_set_wrap(slice_v, wrap_val);
     pwm_set_wrap(slice_w, wrap_val);
 
-    deadtime = wrap_val / 80;
+    deadtime = (wrap_val / 80) * 2;
 
     pwm_set_phase_correct(slice_u, true);
     pwm_set_phase_correct(slice_v, true);
@@ -188,19 +191,18 @@ void pwm_init_set()
     pwm_set_output_polarity(slice_v, false, true);
     pwm_set_output_polarity(slice_w, false, true);
 
-    // 正弦位相ステップ Δθ = 2π * SINE_FREQ_HZ / CARRIER_FREQ_HZ
-    // delta_phase = (float)PHASE_MAX * (float)SINE_FREQ_HZ / (float)CARRIER_FREQ_HZ;
-
     // wrap IRQ を U相スライスで有効化
     pwm_clear_irq(slice_u);
     pwm_set_irq_enabled(slice_u, true);
     irq_set_exclusive_handler(PWM_IRQ_WRAP, pwm_wrap_irq_handler);
     irq_set_enabled(PWM_IRQ_WRAP, true);
 
-    // PWM 有効化（フリーラン開始）
-    pwm_set_enabled(slice_u, true);
-    pwm_set_enabled(slice_v, true);
-    pwm_set_enabled(slice_w, true);
+    // PWM 同時有効化
+    pwm_set_counter(slice_u, 0);
+    pwm_set_counter(slice_v, 0);
+    pwm_set_counter(slice_w, 0);
+    uint32_t slice_mask = (1 << slice_u) | (1 << slice_v) | (1 << slice_w);
+    pwm_set_mask_enabled(slice_mask);
 }
 
 int convert_angle(int8_t rotateNum, int angle_17bit)
