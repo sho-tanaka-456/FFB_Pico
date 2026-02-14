@@ -67,6 +67,7 @@ const uint32_t phase_offset = 57445188; // 9.63deg angleオフセット209004134
 uint32_t delta_phase;                   // 1キャリア周期ごとの位相ステップ
 // PWM wrap 値（TOP）
 uint32_t wrap_val;
+uint32_t deadtime;
 // 各スライス番号・チャネル
 uint slice_u, slice_v, slice_w;
 uint chan_u, chan_v, chan_w;
@@ -85,6 +86,16 @@ volatile int8_t limitRot_core1 = 0;
 const uint32_t angle_offset = 7420;
 volatile int32_t elec_angle = 0;
 /*---------------------------------------------*/
+
+int apply_limit(int value,int max){
+    if (value < 0){
+        value = 0;
+    }
+    if (value > max){
+        value = max;
+    }
+    return value;
+}
 
 // wrap IRQ ハンドラ（例としてU相のラップIRQを使い、3相同時更新）
 void pwm_wrap_irq_handler()
@@ -121,12 +132,12 @@ void pwm_wrap_irq_handler()
     uint32_t dw = (uint32_t)(MR * (sw * 0.5f + 0.5f) * (float)wrap_val); // + rdmValues[(phase >> 20) + 1365]
 
     // 比較レジスタ更新：次周期から反映
-    pwm_set_chan_level(slice_u, chan_u, du);
-    pwm_set_chan_level(slice_v, chan_v, dv);
-    pwm_set_chan_level(slice_w, chan_w, dw);
-    pwm_set_chan_level(slice_u, !chan_u, du);
-    pwm_set_chan_level(slice_v, !chan_v, dv);
-    pwm_set_chan_level(slice_w, !chan_w, dw);
+    pwm_set_chan_level(slice_u, chan_u, apply_limit(du - deadtime / 2, wrap_val));
+    pwm_set_chan_level(slice_v, chan_v, apply_limit(dv - deadtime / 2, wrap_val));
+    pwm_set_chan_level(slice_w, chan_w, apply_limit(dw - deadtime / 2, wrap_val));
+    pwm_set_chan_level(slice_u, !chan_u, apply_limit(du + deadtime / 2, wrap_val));
+    pwm_set_chan_level(slice_v, !chan_v, apply_limit(dv + deadtime / 2, wrap_val));
+    pwm_set_chan_level(slice_w, !chan_w, apply_limit(dw + deadtime / 2, wrap_val));
 }
 
 void pwm_init_set()
@@ -158,6 +169,8 @@ void pwm_init_set()
     pwm_set_wrap(slice_u, wrap_val);
     pwm_set_wrap(slice_v, wrap_val);
     pwm_set_wrap(slice_w, wrap_val);
+
+    deadtime = wrap_val / 80;
 
     pwm_set_phase_correct(slice_u, true);
     pwm_set_phase_correct(slice_v, true);
