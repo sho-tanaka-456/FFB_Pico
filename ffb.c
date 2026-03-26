@@ -16,6 +16,7 @@
 #include "pico/time.h"
 #include "bsp/board.h"
 #include "hardware/pwm.h"
+#include "hardware/adc.h"
 #include "hardware/clocks.h"
 #include "hardware/uart.h"
 #include "hardware/sync.h"
@@ -33,7 +34,7 @@
 #define LED_FFB_ACTIVE 4     // FFBアクティブLED
 #define LED_FFB_MAGNITUDE 24 // FFBマグニチュードLED
 // 三相PWM設定
-#define CARRIER_FREQ_HZ 25000.0f // 25kHz キャリア
+#define CARRIER_FREQ_HZ 20000.0f // 20kHz キャリア
 #define SINE_FREQ_HZ 0.0f        // 変調周波数
 #define PHASE_MAX (1U << 31)
 #define PHASE_RSL (1U << 11)
@@ -41,7 +42,7 @@
 #define UART_ID_1 uart1
 #define UART_BAUD_1 2500000
 
-#define WHEEL_ANGLE 360 // degree
+#define WHEEL_ANGLE 540 // degree
 #define REDUCTION_RATIO 4
 
 /*--------------共有変数------------*/
@@ -59,6 +60,9 @@ volatile bool effect_playing = false;
 volatile int32_t angle_core0 = 0;
 volatile int8_t rotateNum_core0 = 0;
 volatile int8_t limitRot_core0 = 0;
+
+uint16_t adc0 = 0;
+uint16_t apps_y = 0;
 
 /*-------------only use in CORE1-------------*/
 // 位相変数（rad単位）、3相分はオフセットで扱う
@@ -149,9 +153,9 @@ void pwm_init_set()
     gpio_set_function(PIN_UH, GPIO_FUNC_PWM);
     gpio_set_function(PIN_VH, GPIO_FUNC_PWM);
     gpio_set_function(PIN_WH, GPIO_FUNC_PWM);
-    gpio_set_function(PIN_UL, GPIO_FUNC_PWM);
-    gpio_set_function(PIN_VL, GPIO_FUNC_PWM);
-    gpio_set_function(PIN_WL, GPIO_FUNC_PWM);
+    // gpio_set_function(PIN_UL, GPIO_FUNC_PWM);
+    // gpio_set_function(PIN_VL, GPIO_FUNC_PWM);
+    // gpio_set_function(PIN_WL, GPIO_FUNC_PWM);
     slice_u = pwm_gpio_to_slice_num(PIN_UH);
     chan_u = pwm_gpio_to_channel(PIN_UH);
     slice_v = pwm_gpio_to_slice_num(PIN_VH);
@@ -187,9 +191,9 @@ void pwm_init_set()
     pwm_set_chan_level(slice_v, !chan_v, 0);
     pwm_set_chan_level(slice_w, !chan_w, 0);
 
-    pwm_set_output_polarity(slice_u, false, true);
-    pwm_set_output_polarity(slice_v, false, true);
-    pwm_set_output_polarity(slice_w, false, true);
+    // pwm_set_output_polarity(slice_u, false, true);
+    // pwm_set_output_polarity(slice_v, false, true);
+    // pwm_set_output_polarity(slice_w, false, true);
 
     // wrap IRQ を U相スライスで有効化
     pwm_clear_irq(slice_u);
@@ -246,7 +250,7 @@ void send_hid_report()
 {
     static hid_report_t report = {0};
     report.x = convert_angle(rotateNum_core0, angle_core0);
-    report.y = 0;
+    report.y = apps_y;
 
     if (tud_hid_ready())
     {
@@ -460,6 +464,11 @@ void core1_main()
 int main()
 {
     stdio_init_all();
+    adc_init();
+    adc_gpio_init(26);
+    adc_gpio_init(27);
+    adc_gpio_init(28);
+
     // 三相基本波配列計算
     for (int x = 0; x < 2 * PHASE_RSL; x++)
     {
@@ -500,8 +509,23 @@ int main()
         spin_unlock_unsafe(lock);
         restore_interrupts(irq);
 
+        adc_select_input(1);
+        adc0 = adc_read();
+        if (adc0 > 3000)
+        {
+            apps_y = 32767;
+        }
+        else if (adc0 < 1200)
+        {
+            apps_y = 0;
+        }
+        else
+        {
+            apps_y = (int16_t)((float)(adc0 - 1200) / (3000 - 1200) * 32767);
+        }
+
         send_hid_report(); // ゲームパッド状態送信
-        sleep_ms(5);       // 約200Hzで送信
+        // sleep_ms(5);       // 約200Hzで送信
         gpio_put(LED_FFB_ACTIVE, ffb_active);
         gpio_put(LED_FFB_MAGNITUDE, ffb_magnitude != 0);
         if (!ffb_active)
@@ -594,12 +618,12 @@ uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t rid, hid_report_type_t 
     {
         pid_blockload_status_t rpt = {
             //.id               = 0x06,
-            .effectBlockIndex = current_block_idx, // 前回の idx
-            .loadStatus = 1,                       // (1=SUCCESS,2=FULL,3=ERROR…)
+            .effectBlockIndex = 1, // 前回の idx:current_block_idx
+            .loadStatus = 1,       // (1=SUCCESS,2=FULL,3=ERROR…)
             .poolAvailLo = 0xFF,
             .poolAvailHi = 0x7F};
         memcpy(buffer, &rpt, sizeof(rpt));
-        return sizeof(rpt) + 1;
+        return sizeof(rpt);
     }
 
     if (rid == 0x07)

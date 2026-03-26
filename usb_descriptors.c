@@ -7,277 +7,147 @@
 #define CFG_TUSB_HID_EPOUT_BUFSIZE 64
 
 /*--- ゲームパッド用レポート記述子（Usage Page 0x01）+ FFB (PID) 用レポート記述子（Usage Page 0x0F） ---*/
+// clang-format off
 static uint8_t const desc_gamepad[] = {
 
-	0x05,
-	0x01, // USAGE_PAGE (Generic Desktop)
-	0x09,
-	0x05, // USAGE (0x04:Joystick/0x05:Gamepad/0x08:Multi-axis)
-	0xa1,
-	0x01, // COLLECTION (Application) #0
-	0x85,
-	0x01, // REPORT_ID (1)
-	0xa1,
-	0x00, // COLLECTION (Physical) #1
+	0x05, 0x01, // USAGE_PAGE (Generic Desktop)
+	0x09, 0x05, // USAGE (0x04:Joystick/0x05:Gamepad/0x08:Multi-axis)
+	0xa1, 0x01, // COLLECTION (Application) #0
+		0x85, 0x01, // REPORT_ID (1)
+		0xa1, 0x00, // COLLECTION (Physical) #1
+			// Stick
+			0x05, 0x01, // USAGE_PAGE (Generic Desktop)
+			0x09, 0x30, // USAGE (X)
+			0x09, 0x31, // USAGE (Y)
+			0x16, 0x01, 0x80, // LOGICAL_MINIMUM (-32767)
+			0x26, 0xff, 0x7f, // LOGICAL_MAXIMUM (32767)
+			0x75, 0x10, // REPORT_SIZE (16)
+			0x95, 0x02, // REPORT_COUNT (2)
+			0x81, 0x02, // INPUT (Data/Var/Abs)
+		// end collection
+		0xc0, // END_COLLECTION #1
 
-	// Stick
-	0x05,
-	0x01, // USAGE_PAGE (Generic Desktop)
-	0x09,
-	0x30, // USAGE (X)
-	0x09,
-	0x31, // USAGE (Y)
-	0x16,
-	0x01,
-	0x80, // LOGICAL_MINIMUM (-32767)
-	0x26,
-	0xff,
-	0x7f, // LOGICAL_MAXIMUM (32767)
-	0x75,
-	0x10, // REPORT_SIZE (16)
-	0x95,
-	0x02, // REPORT_COUNT (2)
-	0x81,
-	0x02, // INPUT (Data/Var/Abs)
+		// PIDStateReport
+		0x05, 0x0F, // USAGE_PAGE (Physical Interface)
+		0x09, 0x92, // USAGE (PID State Report)
+		0xA1, 0x02, // COLLECTION (Logical)
+			0x85, 0x02, // REPORT_ID (02)
+			0x09, 0x9F, // USAGE (Device Paused)
+			0x09, 0xA0, // USAGE (Actuators Enabled)
+			0x09, 0xA4, // USAGE (Safety Switch)
+			0x09, 0xA5, // USAGE (Actuator Override Switch)
+			0x09, 0xA6, // USAGE (Actuator Power)
+			0x15, 0x00, // LOGICAL_MINIMUM (00)
+			0x25, 0x01, //  Logical Maximum (1)
+			0x35, 0x00, //  Physical Minimum (0)
+			0x45, 0x01, //  Physical Maximum (1)
+			0x75, 0x01, //  Report Size (1)
+			0x95, 0x05, //  Report Count (5)
+			0x81, 0x02, //  Input (variable,absolute)
+			0x95, 0x03, //  Report Count (3)
+			0x81, 0x03, //  Input (Constant, Variable)
+			0x09, 0x94, //  Usage (Effect Playing)
+			0x15, 0x00, //  Logical Minimum (0)
+			0x25, 0x01, //  Logical Maximum (1)
+			0x35, 0x00, //  Physical Minimum (0)
+			0x45, 0x01, //  Physical Maximum (1)
+			0x75, 0x01, //  Report Size (1)
+			0x95, 0x01, //  Report Count (1)
+			0x81, 0x02, //  Input (variable,absolute)
+			0x09, 0x22, //  Usage (Effect Block Index)
+			0x15, 0x01, //  Logical Minimum (1)
+			0x25, 0x28, //  Logical Maximum (40)
+			0x35, 0x01, //  Physical Minimum (1)
+			0x45, 0x28, //  Physical Maximum (40)
+			0x75, 0x07, //  Report Size (7)
+			0x95, 0x01, //  Report Count (1)
+			0x81, 0x02, //  Input (variable,absolute)
+		0xC0, // End Collection Datalink (Logical) (OK)
 
-	// end collection
-	0xc0, // END_COLLECTION #1
+		//================================OutputReport======================================//
 
-	// PIDStateReport
-	0x05,
-	0x0F, // USAGE_PAGE (Physical Interface)
-	0x09,
-	0x92, // USAGE (PID State Report)
-	0xA1,
-	0x02, // COLLECTION (Logical)
-	0x85,
-	0x02, // REPORT_ID (02)
-	0x09,
-	0x9F, // USAGE (Device Paused)
-	0x09,
-	0xA0, // USAGE (Actuators Enabled)
-	0x09,
-	0xA4, // USAGE (Safety Switch)
-	0x09,
-	0xA5, // USAGE (Actuator Override Switch)
-	0x09,
-	0xA6, // USAGE (Actuator Power)
-	0x15,
-	0x00, // LOGICAL_MINIMUM (00)
-	0x25,
-	0x01, //  Logical Maximum (1)
-	0x35,
-	0x00, //  Physical Minimum (0)
-	0x45,
-	0x01, //  Physical Maximum (1)
-	0x75,
-	0x01, //  Report Size (1)
-	0x95,
-	0x05, //  Report Count (5)
-	0x81,
-	0x02, //  Input (variable,absolute)
-	0x95,
-	0x03, //  Report Count (3)
-	0x81,
-	0x03, //  Input (Constant, Variable)
-	0x09,
-	0x94, //  Usage (Effect Playing)
-	0x15,
-	0x00, //  Logical Minimum (0)
-	0x25,
-	0x01, //  Logical Maximum (1)
-	0x35,
-	0x00, //  Physical Minimum (0)
-	0x45,
-	0x01, //  Physical Maximum (1)
-	0x75,
-	0x01, //  Report Size (1)
-	0x95,
-	0x01, //  Report Count (1)
-	0x81,
-	0x02, //  Input (variable,absolute)
-	0x09,
-	0x22, //  Usage (Effect Block Index)
-	0x15,
-	0x01, //  Logical Minimum (1)
-	0x25,
-	0x28, //  Logical Maximum (40)
-	0x35,
-	0x01, //  Physical Minimum (1)
-	0x45,
-	0x28, //  Physical Maximum (40)
-	0x75,
-	0x07, //  Report Size (7)
-	0x95,
-	0x01, //  Report Count (1)
-	0x81,
-	0x02, //  Input (variable,absolute)
-	0xC0, // End Collection Datalink (Logical) (OK)
+		// SetEffectReport
+		0x09, 0x21, // Usage (Set Effect Report)
+		0xA1, 0x02, // Collection Datalink (Logical)
+			0x85, 0x01, // Report ID 1
+			0x09, 0x22, //  Usage (Effect Block Index)
+			0x15, 0x01, //   Logical Minimum (1)
+			0x25, 0x28, //   Logical Maximum (40)
+			0x35, 0x01, //   Physical Minimum (1)
+			0x45, 0x28, //   Physical Maximum (40)
+			0x75, 0x08, //   Report Size (8)
+			0x95, 0x01, //   Report Count (1)
+			0x91, 0x02, //   Output (Data,Var,Abs)
 
-	//================================OutputReport======================================//
+			0x09, 0x25, //  Usage (Effect Type)
+			0xA1, 0x02, //    Collection Datalink (Logical)
+				0x09, 0x26, // USAGE (26)
+				0x09, 0x27, // USAGE (27)
+				0x09, 0x30, // USAGE (30)
+				0x09, 0x31, // USAGE (31)
+				0x09, 0x32, // USAGE (32)
+				0x09, 0x33, // USAGE (33)
+				0x09, 0x34, // USAGE (34)
+				0x09, 0x40, // USAGE (40)
+				0x09, 0x41, // USAGE (41)
+				0x09, 0x42, // USAGE (42)
+				0x09, 0x43, // USAGE (43)
+				0x09, 0x28, // USAGE (28)
+				0x09, 0x28, //      Usage (ET Custom Force Data)
+				0x15, 0x01, //       Logical Minimum (1)
+				0x25, 0x0C, //       Logical Maximum (12)
+				0x35, 0x01, //       Physical Minimum (1)
+				0x45, 0x0C, //       Physical Maximum (12)
+				0x75, 0x08, //       Report Size (8)
+				0x95, 0x01, //       Report Count (1)
+				0x91, 0x00, //       Output (Data)
+			0xC0, //    End Collection Datalink (Logical)
 
-	// SetEffectReport
-	0x09,
-	0x21, // Usage (Set Effect Report)
-	0xA1,
-	0x02, // Collection Datalink (Logical)
-	0x85,
-	0x01, // Report ID 1
-	0x09,
-	0x22, //  Usage (Effect Block Index)
-	0x15,
-	0x01, //   Logical Minimum (1)
-	0x25,
-	0x28, //   Logical Maximum (40)
-	0x35,
-	0x01, //   Physical Minimum (1)
-	0x45,
-	0x28, //   Physical Maximum (40)
-	0x75,
-	0x08, //   Report Size (8)
-	0x95,
-	0x01, //   Report Count (1)
-	0x91,
-	0x02, //   Output (Data,Var,Abs)
-	0x09,
-	0x25, //  Usage (Effect Type)
-	0xA1,
-	0x02, //    Collection Datalink (Logical)
-	0x09,
-	0x26, // USAGE (26)
-	0x09,
-	0x27, // USAGE (27)
-	0x09,
-	0x30, // USAGE (30)
-	0x09,
-	0x31, // USAGE (31)
-	0x09,
-	0x32, // USAGE (32)
-	0x09,
-	0x33, // USAGE (33)
-	0x09,
-	0x34, // USAGE (34)
-	0x09,
-	0x40, // USAGE (40)
-	0x09,
-	0x41, // USAGE (41)
-	0x09,
-	0x42, // USAGE (42)
-	0x09,
-	0x43, // USAGE (43)
-	0x09,
-	0x28, // USAGE (28)
-	0x09,
-	0x28, //      Usage (ET Custom Force Data)
-	0x15,
-	0x01, //       Logical Minimum (1)
-	0x25,
-	0x0C, //       Logical Maximum (12)
-	0x35,
-	0x01, //       Physical Minimum (1)
-	0x45,
-	0x0C, //       Physical Maximum (12)
-	0x75,
-	0x08, //       Report Size (8)
-	0x95,
-	0x01, //       Report Count (1)
-	0x91,
-	0x00, //       Output (Data)
-	0xC0, //    End Collection Datalink (Logical)
-	0x09,
-	0x50, //    Usage (Duration)
-	0x09,
-	0x54, //    Usage (Trigger Repeat Interval)
-	0x09,
-	0x51, //    Usage (Sample Period)
-	0x15,
-	0x00, //     Logical Minimum (0)
-	0x26,
-	0xFF,
-	0x7F, //     Logical Maximum (32767)
-	0x35,
-	0x00, //     Physical Minimum (1)
-	0x46,
-	0xFF,
-	0x7F, //     Physical Maximum (32767)
-	0x66,
-	0x03,
-	0x10, //     Unit (4099)
-	0x55,
-	0xFD, //     Unit Exponent (253)
-	0x75,
-	0x10, //     Report Size (16)
-	0x95,
-	0x03, //     Report Count (3)
-	0x91,
-	0x02, //     Output (Data,Var,Abs)
-	0x55,
-	0x00, //     Unit Exponent (0)
-	0x66,
-	0x00,
-	0x00, //     Unit (0)
-	0x09,
-	0x52, //    Usage (Gain)
-	0x15,
-	0x00, //     Logical Minimum (0)
-	0x26,
-	0xFF,
-	0x00, //     Logical Maximum (255)
-	0x35,
-	0x00, //     Physical Minimum (1)
-	0x46,
-	0x10,
-	0x27, //     Physical Maximum (10000)
-	0x75,
-	0x08, //     Report Size (8)
-	0x95,
-	0x01, //     Report Count (1)
-	0x91,
-	0x02, //     Output (Data,Var,Abs)
-	0x09,
-	0x53, //    Usage (Trigger Button)
-	0x15,
-	0x01, //     Logical Minimum (1)
-	0x25,
-	0x08, //     Logical Maximum (8)
-	0x35,
-	0x01, //     Physical Minimum (1)
-	0x45,
-	0x08, //     Physical Maximum (8)
-	0x75,
-	0x08, //     Report Size (8)
-	0x95,
-	0x01, //     Report Count (1)
-	0x91,
-	0x02, //     Output (Data,Var,Abs)
-	0x09,
-	0x55, //    Usage (Axes Enable)
-	0xA1,
-	0x02, //      Collection Datalink (Logical)
-	0x05,
-	0x01, //        Usage Page (Generic Desktop)
-	0x09,
-	0x30, //        Usage (X)
-	0x09,
-	0x31, //        Usage (Y)
-	0x15,
-	0x00, //        Logical Minimum (0)
-	0x25,
-	0x01, //        Logical Maximum (1)
-	0x75,
-	0x01, //        Report Size (1)
-	0x95,
-	0x02, //        Report Count (2)
-	0x91,
-	0x02, //        Output (Data,Var,Abs)
+	0x09, 0x50, //    Usage (Duration)
+	0x09, 0x54, //    Usage (Trigger Repeat Interval)
+	0x09, 0x51, //    Usage (Sample Period)
+	0x15, 0x00, //     Logical Minimum (0)
+	0x26, 0xFF, 0x7F, //     Logical Maximum (32767)
+	0x35, 0x00, //     Physical Minimum (1)
+	0x46, 0xFF, 0x7F, //     Physical Maximum (32767)
+	0x66, 0x03, 0x10, //     Unit (4099)
+	0x55, 0xFD, //     Unit Exponent (253)
+	0x75, 0x10, //     Report Size (16)
+	0x95, 0x03, //     Report Count (3)
+	0x91, 0x02, //     Output (Data,Var,Abs)
+	0x55, 0x00, //     Unit Exponent (0)
+	0x66, 0x00, 0x00, //     Unit (0)
+	0x09, 0x52, //    Usage (Gain)
+	0x15, 0x00, //     Logical Minimum (0)
+	0x26, 0xFF, 0x00, //     Logical Maximum (255)
+	0x35, 0x00, //     Physical Minimum (1)
+	0x46, 0x10, 0x27, //     Physical Maximum (10000)
+	0x75, 0x08, //     Report Size (8)
+	0x95, 0x01, //     Report Count (1)
+	0x91, 0x02, //     Output (Data,Var,Abs)
+	0x09, 0x53, //    Usage (Trigger Button)
+	0x15, 0x01, //     Logical Minimum (1)
+	0x25, 0x08, //     Logical Maximum (8)
+	0x35, 0x01, //     Physical Minimum (1)
+	0x45, 0x08, //     Physical Maximum (8)
+	0x75, 0x08, //     Report Size (8)
+	0x95, 0x01, //     Report Count (1)
+	0x91, 0x02, //     Output (Data,Var,Abs)
+	0x09, 0x55, //    Usage (Axes Enable)
+	0xA1, 0x02, //      Collection Datalink (Logical)
+	0x05, 0x01, //        Usage Page (Generic Desktop)
+	0x09, 0x30, //        Usage (X)
+	0x09, 0x31, //        Usage (Y)
+	0x15, 0x00, //        Logical Minimum (0)
+	0x25, 0x01, //        Logical Maximum (1)
+	0x75, 0x01, //        Report Size (1)
+	0x95, 0x02, //        Report Count (2)
+	0x91, 0x02, //        Output (Data,Var,Abs)
 	0xC0, //      End Collection Datalink (Logical)
 
-	0x05,
-	0x0F, //    Usage Page (Physical Interface)
-	0x09,
-	0x56, //      Usage (Direction Enable)
-	0x95,
-	0x01, //        Report Count (1)
+	0x05, 0x0F, //    Usage Page (Physical Interface)
+	0x09, 0x56, //      Usage (Direction Enable)
+	0x95, 0x01, //        Report Count (1)
 	0x91,
 	0x02, //        Output (Data,Var,Abs)
 	0x95,
@@ -1308,6 +1178,7 @@ static uint8_t const desc_gamepad[] = {
 	0xC0, // END COLLECTION ()
 	0xC0, // END COLLECTION ()
 };
+// clang-format on
 
 static const char *string_desc_arr[] = {
 	(const char[]){0x09, 0x04}, // LangID = English (0x0409)
@@ -1343,8 +1214,12 @@ tusb_desc_device_t const desc_device = {
 	.bMaxPacketSize0 = CFG_TUD_ENDPOINT0_SIZE,
 
 	// use the ID of Logitech G29
-	.idVendor = 0x046D,
-	.idProduct = 0xC24F,
+	// .idVendor = 0x046D,
+	// .idProduct = 0xC24F,
+	// .bcdDevice = 0x0100,
+
+	.idVendor = 0x2E8A,
+	.idProduct = 0x000A,
 	.bcdDevice = 0x0100,
 
 	.iManufacturer = 0x01,

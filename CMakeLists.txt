@@ -54,6 +54,7 @@ target_link_libraries(ffb
         tinyusb_board
         hardware_gpio
         hardware_pwm
+        hardware_adc
         hardware_clocks
         hardware_uart
         hardware_sync
