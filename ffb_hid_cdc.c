@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 #include "pico/time.h"
@@ -20,6 +22,7 @@
 #include "hardware/clocks.h"
 #include "hardware/uart.h"
 #include "hardware/sync.h"
+#include "hardware/spi.h"
 // 設定：使用GPIOピンと周波数
 #define PIN_UH 20
 #define PIN_VH 16
@@ -31,6 +34,11 @@
 #define RE_PIN 6             // MAX485 RE
 #define UART_TX_PIN_uart1 8  // TXピン
 #define UART_RX_PIN_uart1 9  // RXピン
+#define MCP3204_PIN_DOUT  12
+#define MCP3204_PIN_CS    13
+#define MCP3204_PIN_CLK   14
+#define MCP3204_PIN_DIN   15
+
 #define LED_FFB_ACTIVE 4     // FFBアクティブLED
 #define LED_FFB_MAGNITUDE 24 // FFBマグニチュードLED
 // 三相PWM設定
@@ -41,6 +49,8 @@
 // UART設定
 #define UART_ID_1 uart1
 #define UART_BAUD_1 2500000
+// SPI設定
+#define MCP3204_SPI       spi1
 
 #define WHEEL_ANGLE 540 // degree
 #define REDUCTION_RATIO 4
@@ -63,6 +73,7 @@ volatile int8_t limitRot_core0 = 0;
 
 uint16_t adc0 = 0;
 uint16_t apps_y = 0;
+volatile uint16_t current_adc_raw[4] = {0, 0, 0, 0};
 
 /*-------------only use in CORE1-------------*/
 // 位相変数（rad単位）、3相分はオフセットで扱う
@@ -350,10 +361,89 @@ void uart_init_set()
     uart1_send(0xEA);
     sleep_ms(1);
 }
+// MCP3204 ADC初期化
+static void mcp3204_init(void)
+{
+    spi_init(MCP3204_SPI, 1000 * 1000);
+
+    spi_set_format(
+        MCP3204_SPI,
+        8,
+        SPI_CPOL_0,
+        SPI_CPHA_0,
+        SPI_MSB_FIRST
+    );
+
+    gpio_set_function(MCP3204_PIN_DOUT, GPIO_FUNC_SPI);
+    gpio_set_function(MCP3204_PIN_CLK, GPIO_FUNC_SPI);
+    gpio_set_function(MCP3204_PIN_DIN, GPIO_FUNC_SPI);
+
+    gpio_init(MCP3204_PIN_CS);
+    gpio_set_dir(MCP3204_PIN_CS, GPIO_OUT);
+    gpio_put(MCP3204_PIN_CS, 1);
+}
+// 電流センサ出力を読む
+static uint16_t mcp3204_read_raw(uint8_t channel)
+{
+    if (channel > 3) {
+        return 0;
+    }
+
+    uint8_t tx[3] = {
+        0x06,
+        (uint8_t)(channel << 6),
+        0x00
+    };
+
+    uint8_t rx[3] = {0};
+
+    gpio_put(MCP3204_PIN_CS, 0);
+
+    spi_write_read_blocking(
+        MCP3204_SPI,
+        tx,
+        rx,
+        sizeof(tx)
+    );
+
+    gpio_put(MCP3204_PIN_CS, 1);
+
+    return (uint16_t)(((uint16_t)(rx[1] & 0x0f) << 8) | rx[2]);
+}
+
+// TinyUSB CDC logging. Do not enable pico_stdio_usb concurrently.
+static void cdc_logf(const char *fmt, ...)
+{
+    if (!tud_cdc_connected()) return;
+    char buffer[192];
+    va_list args;
+    va_start(args, fmt);
+    int len = vsnprintf(buffer, sizeof(buffer), fmt, args);
+    va_end(args);
+    if (len <= 0) return;
+    uint32_t bytes = (uint32_t)len;
+    if (bytes >= sizeof(buffer)) bytes = sizeof(buffer) - 1;
+    uint32_t available = tud_cdc_write_available();
+    if (bytes > available) bytes = available;
+    if (bytes) {
+        tud_cdc_write(buffer, bytes);
+        tud_cdc_write_flush();
+    }
+}
+
+void tud_cdc_rx_cb(uint8_t itf)
+{
+    uint8_t buffer[64];
+    while (tud_cdc_n_available(itf)) {
+        (void)tud_cdc_n_read(itf, buffer, sizeof(buffer));
+    }
+}
 
 // core_1 モーター制御関係
 void core1_main()
 {
+    mcp3204_init();
+    absolute_time_t next_current_sample = make_timeout_time_ms(10);
     // モーター制御用数値設定
     phase = phase_offset;
     angle = angle_offset;
@@ -370,6 +460,15 @@ void core1_main()
         uart1_send(0x1A); // エンコーダーコマンド送信
         sleep_us(100);
         uart1_receive(); // エンコーダーデータ受信
+
+        // Monitoring only: outside the PWM IRQ and not PWM-synchronous.
+        if (absolute_time_diff_us(get_absolute_time(), next_current_sample) <= 0) {
+            current_adc_raw[0] = mcp3204_read_raw(0);
+            current_adc_raw[1] = mcp3204_read_raw(1);
+            current_adc_raw[2] = mcp3204_read_raw(2);
+            current_adc_raw[3] = mcp3204_read_raw(3);
+            next_current_sample = make_timeout_time_ms(10);
+        }
 
         pre_angle = angle;
         pre_delta_angle = delta_angle;
@@ -495,9 +594,16 @@ int main()
     gpio_set_dir(LED_FFB_ACTIVE, GPIO_OUT);
     gpio_set_dir(LED_FFB_MAGNITUDE, GPIO_OUT);
 
+    absolute_time_t next_cdc_log = make_timeout_time_ms(500);
     while (true)
     {
-        tud_task(); // USBタスク処理
+        tud_task(); // HID + CDC USB task processing
+        if (absolute_time_diff_us(get_absolute_time(), next_cdc_log) <= 0) {
+            cdc_logf("MCP3204 CH0=%4u CH1=%4u CH2=%4u CH3=%4u\r\n",
+                     current_adc_raw[0], current_adc_raw[1],
+                     current_adc_raw[2], current_adc_raw[3]);
+            next_cdc_log = make_timeout_time_ms(100);
+        }
 
         // 排他制御して読み込み
         uint32_t irq = save_and_disable_interrupts();

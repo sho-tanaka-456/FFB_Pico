@@ -36,7 +36,7 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(ffb
-    ffb.c
+    ffb_hid_cdc.c
     usb_descriptors.c
     )
 
@@ -58,6 +58,7 @@ target_link_libraries(ffb
         hardware_clocks
         hardware_uart
         hardware_sync
+        hardware_spi
         pico_multicore
         pico_time
         )
