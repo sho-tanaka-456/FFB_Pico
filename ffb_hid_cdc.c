@@ -113,7 +113,7 @@ volatile uint8_t direction_cmd = 0;        // 0:stop, 1:+, 2:-
 
 volatile int8_t rotateNum_core1 = 0;
 volatile int8_t limitRot_core1 = 0;
-const uint32_t angle_offset = 7420;
+const uint32_t angle_offset = 7420; // 生のエンコーダーの0点と物理ハンドルの0点を合わせるためのオフセット値
 volatile int32_t elec_angle = 0;
 
 static volatile int32_t current_offset_raw = 2048;
@@ -493,20 +493,19 @@ void uart1_receive()
         }
     }
 }
-// エンコーダーデコード
+// エンコーダーデコード : 17bitデータの復号 (-65535~65535) 0点を物理ハンドルと合わせるためオフセット有り
 int decode_encoder_angle(uint8_t abs0, uint8_t abs1, uint8_t abs2)
-{ // 17bitデータの復号
-    int32_t pos = ((abs2 & 0x7F) << 16) + (abs1 << 8) + abs0 - angle_offset;
-    if (pos > 131072 / 2)
+{ // 17bitデータの復号 -65535~65535
+    int32_t position = ((abs2 & 0x7F) << 16) + (abs1 << 8) + abs0 - angle_offset;
+    if (position > 131072 / 2)
     {
-        pos -= 131072;
+        position -= 131072;
     }
-    if (pos < -131072 / 2)
+    if (position < -131072 / 2)
     {
-        pos += 131072;
+        position += 131072;
     }
-    // printf("%d\n",pos);
-    return pos;
+    return position;
 }
 
 void uart_init_set()
@@ -643,10 +642,10 @@ void core1_main()
         // 排他制御して読み込み
         uint32_t irq = save_and_disable_interrupts();
         spin_lock_unsafe_blocking(lock);
-        local_magnitude = magnitude_share; // fetch
-        limitRot_core1 = limitRot_share;   // fetch
-        angle_share = angle;               // pass
-        rotateNum_share = rotateNum_core1; // pass
+        local_magnitude = magnitude_share; // from core0
+        limitRot_core1 = limitRot_share;   // from core0
+        angle_share = angle;               // to core0
+        rotateNum_share = rotateNum_core1; // to core0
         spin_unlock_unsafe(lock);
         restore_interrupts(irq);
 
